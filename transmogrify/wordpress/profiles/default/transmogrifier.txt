@@ -1,0 +1,1 @@
+transmogrify.wordpress:wordpress.cfg
