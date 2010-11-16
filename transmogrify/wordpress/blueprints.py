@@ -1,7 +1,7 @@
 import urllib2
 from urlparse import urlsplit
 import re
-from lxml import etree
+from lxml import etree, cssselect, html
 from urllib import unquote_plus
 from zope.interface import classProvides, implements
 from collective.transmogrifier.interfaces import ISection
@@ -24,6 +24,7 @@ logger = logging.getLogger('transmogrify.wordpress')
 CONTENT = '{http://purl.org/rss/1.0/modules/content/}'
 DC = '{http://purl.org/dc/elements/1.1/}'
 WP = '{http://wordpress.org/export/1.0/}'
+
 
 class WXRSource(object):
     classProvides(ISectionBlueprint)
@@ -51,6 +52,7 @@ class WXRSource(object):
             item_id = unquote_plus(item_id).decode('utf8').encode('ascii', 'ignore')
             path = '/'.join([self.path, item_id])
             item['_path']         = path
+            item['_orig_url']     = node.findtext('link')
             logger.info('Importing %s' % path)
             
             item['title']         = node.findtext('title')
@@ -103,6 +105,9 @@ class WXRSource(object):
             # release memory
             node.clear()
             
+            # if i > MAX:
+            #     break
+            
         file.close()
 
 
@@ -140,6 +145,37 @@ def safe_urlopen(url):
         return urllib2.urlopen(urllib2.Request(url))
     except urllib2.URLError:
         return None
+
+
+class HTMLFetcher(object):
+    """
+    Parse HTML for images and inject them into the pipeline so that they can
+    be served locally.
+    """
+    classProvides(ISectionBlueprint)
+    implements(ISection)
+
+    def __init__(self, transmogrifier, name, options, previous):
+        self.options = options
+        self.previous = previous
+        self.url_key = options.get('url_key', '_orig_url')
+        self.target_key = options.get('target_key', 'text')
+        self.selector = options.get('selector', 'div.entry')
+
+    def __iter__(self):
+        for item in self.previous:
+
+            if self.url_key in item:
+                url = item[self.url_key]
+                res = safe_urlopen(url)
+                if res is not None:
+                    page = res.read()
+                    tree = etree.parse(StringIO(page), etree.HTMLParser())
+                    selector = cssselect.CSSSelector(self.selector)
+                    text = ''.join([html.tostring(n) for n in tree.xpath(selector.path)[0]]).encode('utf8')
+                    item[self.target_key] = text
+
+            yield item
 
 
 class ImageMungingParser(TinyMCEOutput):

@@ -28,6 +28,11 @@
       />
 
   <utility
+      component=".blueprints.HTMLFetcher"
+      name="transmogrify.wordpress.blueprints.fetch_html"
+      />
+
+  <utility
       component=".blueprints.HTMLImageSource"
       name="transmogrify.wordpress.blueprints.html_image_source"
       />

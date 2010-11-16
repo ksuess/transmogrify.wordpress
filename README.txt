@@ -38,6 +38,10 @@ type
   The desired portal_type for blog entries.  Must be an Archetypes-based type
   with a 'text' field, and must already exist in the site.  The default,
   'Blog Entry', may be obtained by installing `Scrawl`_.
+entry-selector
+  CSS selector to find the body of the post within its original HTML page.
+  (The body is fetched this way instead of using the one in the WXR,
+  because the WXR contains special Wordpress markup.)
 
 
 Other prerequisites:
@@ -70,8 +74,6 @@ without a little coaxing.  Contributions to improve it are welcome.
   Plone.
 
 * Wordpress' "categories" and "tags" are lumped together as Plone "tags".
-
-* Wordpress' square-bracket pseudo-tags are not yet handled.
 
 * Image sources are currently updated with path-based links even if the site is
   configured to link by UID.
@@ -124,6 +126,8 @@ Sets the following pipeline keys:
 
 portal_type
   Value of the ``type`` setting for blog posts. ``plone.Comment`` for comments.
+_orig_url
+  The URL of the original blog post.
 _path
   Path of the new item, based on the ``path`` setting and the Wordpress post_name.
   For comments, path of the item to which the comment should be added.
@@ -166,6 +170,26 @@ Cleans up Wordpress markup into more standard HTML.  In particular, it will:
 
 These operations are performed on the pipeline key named in the blueprint's
 ``key`` setting (defaults to "text").
+
+
+transmogrify.wordpress.blueprints.fetch_html
+--------------------------------------------
+
+Fetches the content of an HTML page and selects a portion of it, which it
+places (UTF8-encoded) into a pipeline key.
+
+Settings:
+
+url_key
+  Name of the pipeline key which gives the URL to be fetched. (Default:
+  ``_orig_url``.)
+selector
+  CSS selector specifying which portion of the retrieved page to retain.
+target_key
+  Name of the pipeline key where the fetched HTML should be stored.
+
+If the url_key is not found for the current item, or the page cannot be
+retrieved, no change will be made to the target key.
 
 
 transmogrify.wordpress.blueprints.html_image_source
