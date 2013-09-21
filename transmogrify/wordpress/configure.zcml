@@ -47,4 +47,9 @@
       name="transmogrify.wordpress.blueprints.comment_constructor"
       />
 
+  <utility
+      component=".blueprints.WPPostmetaEnclosureSource"
+      name="transmogrify.wordpress.blueprints.postmeta_enclosure_source"
+      />
+
 </configure>
