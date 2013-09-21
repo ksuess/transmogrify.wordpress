@@ -121,6 +121,8 @@ path
   Path relative to the site root where blog posts should be imported.
 type
   portal_type that should be used for imported blog posts.
+import-comments
+  you can choose to import wordpress comments.  defaults to false
 
 Sets the following pipeline keys:
 

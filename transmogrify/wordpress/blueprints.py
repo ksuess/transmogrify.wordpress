@@ -36,6 +36,9 @@ class WXRSource(object):
         self.filename = options['filename']
         self.portal_type = options['type']
         self.path = options['path']
+        comment_option = options.get('import-comments', '')
+        true_options = ('t', 'y', 'true', 'yes')
+        self.include_comments = bool(comment_option.lower() in true_options)
 
     def __iter__(self):
         for item in self.previous:
@@ -43,6 +46,7 @@ class WXRSource(object):
 
         file = open(self.filename, 'rb')
         i = 0
+        import pdb; pdb.set_trace( )
         for event, node in etree.iterparse(self.filename):
             # workaround for bug in lxml < 3.2.2
             # (see https://bugs.launchpad.net/lxml/+bug/1185701)
@@ -86,39 +90,38 @@ class WXRSource(object):
             yield item
 
             # comments
-            by_comment_id = lambda x: x.findtext(WP + 'comment_id')
-            for node in sorted(node.iterfind(WP + 'comment'), key=by_comment_id):
-                # skip spam/unapproved comments
-                if node.findtext(WP + 'comment_approved') != '1':
-                    continue
+            if self.include_comments:
+                by_comment_id = lambda x: x.findtext(WP + 'comment_id')
+                for cmt in sorted(node.iterfind(WP + 'comment'),
+                                  key=by_comment_id):
+                    # skip spam/unapproved comments
+                    if cmt.findtext(WP + 'comment_approved') != '1':
+                        continue
 
-                text = safe_unicode(node.findtext(WP + 'comment_content'))
-                author_name = node.findtext(WP + 'comment_author')
-                # add link to pingbacks
-                if node.findtext(WP + 'comment_type') == 'pingback':
-                    url = node.findtext(WP + 'comment_author_url')
-                    text = u'<a href="%s">%s</a>' % (url, text)
-                    author_name = None
+                    text = safe_unicode(cmt.findtext(WP + 'comment_content'))
+                    author_name = cmt.findtext(WP + 'comment_author')
+                    # add link to pingbacks
+                    if cmt.findtext(WP + 'comment_type') == 'pingback':
+                        url = cmt.findtext(WP + 'comment_author_url')
+                        text = u'<a href="%s">%s</a>' % (url, text)
+                        author_name = None
 
-                item = dict()
-                item['portal_type']  = 'plone.Comment'
-                item['_path']        = path # path to parent object
-                item['_comment_id']  = int(node.findtext(WP + 'comment_id'))
-                item['_in_reply_to'] = int(node.findtext(WP + 'comment_parent'))
-                item['author_name']  = author_name
-                item['author_email'] = node.findtext(WP + 'comment_author_email')
-                item['created']      = node.findtext(WP + 'comment_date')
-                item['text']         = node.findtext(WP + 'comment_content')
+                    item = {
+                        'portal_type': 'plone.Comment',
+                        '_path': path, # path to parent object
+                        '_comment_id': int(cmt.findtext(WP + 'comment_id')),
+                        '_in_reply_to': int(cmt.findtext(WP + 'comment_parent')),
+                        'author_name': author_name,
+                        'author_email': cmt.findtext(WP + 'comment_author_email'),
+                        'created': cmt.findtext(WP + 'comment_date'),
+                        'text': cmt.findtext(WP + 'comment_content'),
+                    }
 
-                yield item
+                    yield item
 
-            # release memory
-            node.clear()
+                    cmt.clear()
 
-            # if i > MAX:
-            #     break
-        except Exception, e:
-            import pdb; pdb.set_trace( )
+                node.clear()
 
         file.close()
 
@@ -176,7 +179,6 @@ class HTMLFetcher(object):
 
     def __iter__(self):
         for item in self.previous:
-
             if self.url_key in item:
                 url = item[self.url_key]
                 res = safe_urlopen(url)
