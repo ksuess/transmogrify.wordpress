@@ -46,13 +46,11 @@ class WXRSource(object):
 
         file = open(self.filename, 'rb')
         i = 0
-        import pdb; pdb.set_trace( )
         for event, node in etree.iterparse(self.filename):
             # workaround for bug in lxml < 3.2.2
             # (see https://bugs.launchpad.net/lxml/+bug/1185701)
             if node.tag != 'item':
                 if node.getparent() is None:
-                    import pdb; pdb.set_trace( )
                     break
                 else:
                     continue
