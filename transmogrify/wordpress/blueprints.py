@@ -2,6 +2,7 @@ import urllib2
 from urlparse import urlsplit
 import re
 from lxml import etree, cssselect, html
+import phpserialize
 from urllib import unquote_plus
 from zope.interface import classProvides, implements
 from collective.transmogrifier.interfaces import ISection
@@ -27,6 +28,13 @@ DC = '{http://purl.org/dc/elements/1.1/}'
 WP = '{http://wordpress.org/export/1.2/}'
 
 
+def get_meta_values_by_key(node, meta_key):
+    for postmeta in node.iterfind(WP + 'postmeta'):
+        if postmeta.find(WP + 'meta_key').text == meta_key:
+            yield postmeta.find(WP + 'meta_value').text
+    
+
+
 class WXRSource(object):
     classProvides(ISectionBlueprint)
     implements(ISection)
@@ -46,7 +54,17 @@ class WXRSource(object):
 
         file = open(self.filename, 'rb')
         i = 0
+        self.wp_base_site_url = self.wp_base_blog_url = None
         for event, node in etree.iterparse(self.filename):
+            # extract the base site and blog urls for later comparison
+            if not (self.wp_base_site_url and self.wp_base_blog_url):
+                # keep searching for these values so we can include them in
+                # each item
+                if node.tag == WP + 'base_site_url':
+                    self.wp_base_site_url = node.text
+                if node.tag == WP + 'base_blog_url':
+                    self.wp_base_blog_url = node.text
+
             # workaround for bug in lxml < 3.2.2
             # (see https://bugs.launchpad.net/lxml/+bug/1185701)
             if node.tag != 'item':
@@ -65,7 +83,27 @@ class WXRSource(object):
             path = '/'.join([self.path, item_id])
             item['_path']         = path
             item['_orig_url']     = node.findtext('link')
+
+            if self.wp_base_site_url:
+                item['_base_site_url'] = self.wp_base_site_url
+            if self.wp_base_blog_url:
+                item['_base_blog_url'] = self.wp_base_blog_url
+
             logger.info('Importing %s' % path)
+
+            # capture media enclosures in item for later use
+            item['_postmeta_enclosures'] = self.extract_media_enclosures(node)
+            # capture disqus thread ids for posts with disqus comments
+            #   the value passed might be None, so the import pipeline
+            #   section for this should be primed to ignore that value
+            item['_disqus_thread_id'] = self.extract_disqus_thread_id(node)
+            # capture image attachments as represented by the 'Image' postmeta
+            # key.  Ensure that the image urls are unique so we don't download
+            # any of them more than once.  
+            item['_postmeta_images'] = self.extract_postmeta_images(node)
+            # capture wordpress attachments as represented by the 
+            # 'wp:attachment_url' tag and associated post metadata
+            item['_wordpress_attachments'] = self.extract_wp_attachments(node)
 
             item['title']         = node.findtext('title')
             item['description']   = node.findtext('description')
@@ -122,6 +160,52 @@ class WXRSource(object):
                 node.clear()
 
         file.close()
+
+    def extract_media_enclosures(self, node):
+        """if the node has wp:postmeta 'enclosure' tags, preserve the
+        content as media files
+        """
+        # XXX: this is fairly naive, assuming that all enclosures contain
+        #      a three-value meta_value, consisiting of the item url, size and
+        #      mimetype
+        enclosures = []
+        enclosure_keys = ['url', 'size', 'mimetype']
+        for enclosure in get_meta_values_by_key(node, 'enclosure'):
+            enclosure_values = enclosure.split()
+            enclosures.append(dict(zip(enclosure_keys, enclosure_values)))
+        return enclosures
+
+    def extract_disqus_thread_id(self, node):
+        possible = tuple(get_meta_values_by_key(node, 'dsq_thread_id'))
+        if len(possible) > 0:
+            return possible[0]
+
+    def extract_postmeta_images(self, node):
+        """get a tuple of all the images named in postmeta, in order
+
+        because the images are sometimes repeated, get unique, but still in
+        order of presence in the wxr file
+        """
+        images = set()
+        order = []
+        for image_url in get_meta_values_by_key(node, 'Image'):
+            images.add(image_url)
+            order.append(image_url)
+        return sorted(tuple(images), key=lambda x: order.index(x))
+
+    def extract_wp_attachments(self, node):
+        attachments = []
+        for attachment_url in node.iterfind(WP + 'attachment_url'):
+            attachment = dict(url=attachment_url.text, files=[], metadata=[],
+                              backups=[])
+            for filename in get_meta_values_by_key(node, '_wp_attached_file'):
+                attachment['files'].append(filename)
+            for metadata in get_meta_values_by_key(node, '_wp_attachment_metadata'):
+                attachment['metadata'].append(phpserialize.loads(metadata))
+            for bkp in get_meta_values_by_key(node, '_wp_attachment_backup_sizes'):
+                attachment['backups'].append(phpserialize.loads(bkp))
+            attachments.append(attachment)
+        return attachments
 
 
 class WordpressTextCleanupSection(object):
@@ -306,7 +390,6 @@ class HTMLImageSource(object):
 
     def __iter__(self):
         for item in self.previous:
-
             images = []
             if self.key in item:
                 text = item[self.key]
@@ -321,6 +404,70 @@ class HTMLImageSource(object):
             for item in images:
                 yield item
 
+
+class WPPostmetaEnclosureSource(object):
+    """download and insert into the pipeline any files referenced in 'enclosure'
+    postmeta tags
+    
+    enclosures will be a list of dicts with the keys 'url', 'size' and 
+    'mimetype'
+    """
+    classProvides(ISectionBlueprint)
+    implements(ISection)
+
+    def __init__(self, transmogrifier, name, options, previous):
+        self.options = options
+        self.previous = previous
+        self.enclosure_key = '_postmeta_enclosures'
+        self.base_path = options.get('path', 'enclosures')
+        self.site_path = '/'.join(transmogrifier.context.getPhysicalPath())
+
+    def __iter__(self):
+        for item in self.previous:
+            # no enclosures, skip
+            if not self.enclosure_key in item:
+                yield item; continue
+
+            # XXX: it would be good to add a relationship between enclosures
+            # and the posts they are related to.  How might we do this?
+            # 
+            item['_enclosure_internal_paths'] = []
+            for enclosure in item[self.enclosure_key]:
+                res = safe_urlopen(enclosure['url'])
+                if res is not None:
+                    scheme, host, path, query, frag = urlsplit(enclosure['url'])
+                    filename = path.split('/')[-1]
+                    # Zope ids need to be ASCII
+                    filename = unquote_plus(
+                        filename).decode('utf8').encode('ascii', 'ignore')
+                    encl = dict()
+                    if 'image' in enclosure['mimetype']:
+                        encl['portal_type'] = 'Image'
+                        filetitle = 'image'
+                        item_key = 'image'
+                    else:
+                        encl['portal_type'] = 'File'
+                        filetitle = 'file'
+                        item_key = 'file'
+                    # wrap the data so it'll get added with the correct 
+                    # filename & mimetype
+                    data = File(filename, filetitle, StringIO(res.read()), 
+                                enclosure['mimetype'])
+                    path = '/'.join([self.base_path, filename])
+                    # XXX avoid collisions
+                    encl['_path'] = path
+                    encl[item_key] = data
+                    logger.info('Importing %s' % path)
+                    # add the location where this enclosure will be added
+                    # to the list of internal enclosures.  We can use this 
+                    # later as a way of connecting the original item to the
+                    # enclosure.
+                    item['_enclosure_internal_paths'].append(path)
+                    # yield the enclosure first so it will exist when the 
+                    # containing item is created.
+                    yield encl
+
+            yield item
 
 class MimetypeSetter(object):
     classProvides(ISectionBlueprint)
