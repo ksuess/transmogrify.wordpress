@@ -43,6 +43,7 @@ setup(name='transmogrify.wordpress',
                         'collective.transmogrifier',
                         'plone.app.transmogrifier',
                         'lxml',
+                        'phpserialize'
                         # -*- Extra requirements: -*-
                         ],
       tests_require=tests_require,
