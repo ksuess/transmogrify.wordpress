@@ -1,8 +1,8 @@
 Changelog
 =========
 
-1.0 (unreleased)
-----------------
+1.0a1 (unreleased)
+------------------
 
 - Add pipeline section for downloading postmeta enclosures from their source
   and inserting them into the pipeline to be created along with the blog post

@@ -2,28 +2,20 @@
 """
 This module contains the tool of transmogrify.wordpress
 """
-import os
-from setuptools import setup, find_packages
-
-
-def read(*rnames):
-    return open(os.path.join(os.path.dirname(__file__), *rnames)).read()
+from setuptools import find_packages
+from setuptools import setup
 
 version = '1.0a1'
-
+description = 'Transmogrifier pipelines for importing a Wordpress blog into Plone.'
 long_description = (
-    read('README.rst')
-    + '\n' +
-    read('CHANGES.txt')
-    + '\n' +
-    'Download\n'
-    '********\n')
-
-tests_require = ['zope.testing']
+    open('README.rst').read() + '\n' +
+    open('CONTRIBUTORS.rst').read() + '\n' +
+    open('CHANGES.rst').read()
+)
 
 setup(name='transmogrify.wordpress',
       version=version,
-      description="collective.transmogrifier pipeline to import a blog from Wordpress to Plone",
+      description=description,
       long_description=long_description,
       classifiers=[
         'Framework :: Plone',
@@ -43,12 +35,15 @@ setup(name='transmogrify.wordpress',
                         'collective.transmogrifier',
                         'plone.app.transmogrifier',
                         'lxml',
-                        'phpserialize'
-                        # -*- Extra requirements: -*-
+                        'phpserialize',
+                        'requests',
                         ],
-      tests_require=tests_require,
-      extras_require=dict(tests=tests_require),
-      test_suite='transmogrify.wordpress.tests.test_docs.test_suite',
+      extras_require={
+          'test': [
+              'plone.app.testing',
+              'plone.testing',
+          ],
+      },
       entry_points="""
       # -*- entry_points -*-
       [z3c.autoinclude.plugin]

@@ -8,7 +8,6 @@
   <include package="collective.transmogrifier"/>
   <include package="plone.app.transmogrifier"/>
 
-  <!-- Register the installation GenericSetup extension profile -->
   <genericsetup:registerProfile
       name="default"
       title="transmogrify.wordpress"
@@ -16,7 +15,7 @@
       description=""
       provides="Products.GenericSetup.interfaces.EXTENSION"
       />
-  
+
   <utility
       component=".blueprints.WXRSource"
       name="transmogrify.wordpress.blueprints.wxrsource"
@@ -50,6 +49,41 @@
   <utility
       component=".blueprints.WPPostmetaEnclosureSource"
       name="transmogrify.wordpress.blueprints.postmeta_enclosure_source"
+      />
+
+  <utility
+      component=".blueprints.csvsource.CSVSource"
+      name="transmogrify.wordpress.csvsource"
+      />
+
+  <utility
+      component=".blueprints.resolveuid.ResolveUID"
+      name="transmogrify.wordpress.resolveuid"
+      />
+
+  <utility
+      component=".blueprints.relatecontent.RelateContent"
+      name="transmogrify.wordpress.relatecontent"
+      />
+
+  <utility
+      component=".blueprints.moveattachment.MoveAttachment"
+      name="transmogrify.wordpress.moveattachment"
+      />
+
+  <utility
+      component=".blueprints.embedyoutube.EmbedYoutube"
+      name="transmogrify.wordpress.embedyoutube"
+      />
+
+  <utility
+      component=".blueprints.fetchattachment.FetchAttachment"
+      name="transmogrify.wordpress.fetchattachment"
+      />
+
+  <utility
+      component=".blueprints.defaultview.DefaultView"
+      name="transmogrify.wordpress.defaultview"
       />
 
 </configure>

@@ -1,0 +1,4 @@
+include *.rst
+graft transmogrify
+graft docs
+global-exclude *.pyc

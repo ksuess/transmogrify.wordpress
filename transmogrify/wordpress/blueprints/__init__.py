@@ -32,7 +32,7 @@ def get_meta_values_by_key(node, meta_key):
     for postmeta in node.iterfind(WP + 'postmeta'):
         if postmeta.find(WP + 'meta_key').text == meta_key:
             yield postmeta.find(WP + 'meta_value').text
-    
+
 
 
 class WXRSource(object):
@@ -99,9 +99,9 @@ class WXRSource(object):
             item['_disqus_thread_id'] = self.extract_disqus_thread_id(node)
             # capture image attachments as represented by the 'Image' postmeta
             # key.  Ensure that the image urls are unique so we don't download
-            # any of them more than once.  
+            # any of them more than once.
             item['_postmeta_images'] = self.extract_postmeta_images(node)
-            # capture wordpress attachments as represented by the 
+            # capture wordpress attachments as represented by the
             # 'wp:attachment_url' tag and associated post metadata
             item['_wordpress_attachments'] = self.extract_wp_attachments(node)
 
@@ -223,15 +223,18 @@ class WordpressTextCleanupSection(object):
             yield item
 
     PRE_RE = re.compile(r'(<pre>.*?</pre>)', re.IGNORECASE | re.DOTALL)
+    CAPTION_RE = re.compile(r'\[/?caption.*?\]', re.IGNORECASE | re.DOTALL)
     def cleanup_text(self, text):
         # - encode if necessary
         # - normalize newlines
         # - replace double-newlines with paragraph tags
         # - replace single newlines with linebreak tags
+        # - remove custom caption tag
         if isinstance(text, unicode):
             text = text.encode('utf8')
         text = self.PRE_RE.sub(lambda x: x.group(1).replace('\r\n\r\n', '\n\n'), text)
         text = text.replace('\r\n\r\n', '<p>').replace('\r\n','\n').replace('\n', '<br />\n')
+        text = self.CAPTION_RE.sub('', text)
         return text
 
         # TODO: handle [googlevideo] links, [gallery], [caption], others?
@@ -408,8 +411,8 @@ class HTMLImageSource(object):
 class WPPostmetaEnclosureSource(object):
     """download and insert into the pipeline any files referenced in 'enclosure'
     postmeta tags
-    
-    enclosures will be a list of dicts with the keys 'url', 'size' and 
+
+    enclosures will be a list of dicts with the keys 'url', 'size' and
     'mimetype'
     """
     classProvides(ISectionBlueprint)
@@ -430,7 +433,7 @@ class WPPostmetaEnclosureSource(object):
 
             # XXX: it would be good to add a relationship between enclosures
             # and the posts they are related to.  How might we do this?
-            # 
+            #
             item['_enclosure_internal_paths'] = []
             for enclosure in item[self.enclosure_key]:
                 res = safe_urlopen(enclosure['url'])
@@ -449,9 +452,9 @@ class WPPostmetaEnclosureSource(object):
                         encl['portal_type'] = 'File'
                         filetitle = 'file'
                         item_key = 'file'
-                    # wrap the data so it'll get added with the correct 
+                    # wrap the data so it'll get added with the correct
                     # filename & mimetype
-                    data = File(filename, filetitle, StringIO(res.read()), 
+                    data = File(filename, filetitle, StringIO(res.read()),
                                 enclosure['mimetype'])
                     path = '/'.join([self.base_path, filename])
                     # XXX avoid collisions
@@ -459,11 +462,11 @@ class WPPostmetaEnclosureSource(object):
                     encl[item_key] = data
                     logger.info('Importing %s' % path)
                     # add the location where this enclosure will be added
-                    # to the list of internal enclosures.  We can use this 
+                    # to the list of internal enclosures.  We can use this
                     # later as a way of connecting the original item to the
                     # enclosure.
                     item['_enclosure_internal_paths'].append(path)
-                    # yield the enclosure first so it will exist when the 
+                    # yield the enclosure first so it will exist when the
                     # containing item is created.
                     yield encl
 

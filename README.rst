@@ -1,6 +1,15 @@
 Introduction
 ============
 
+.. image:: http://img.shields.io/pypi/v/transmogrify.wordpress.svg
+    :target: https://pypi.python.org/pypi/transmogrify.wordpress
+
+.. image:: https://img.shields.io/travis/collective/transmogrify.wordpress/master.svg
+    :target: http://travis-ci.org/collective/transmogrify.wordpress
+
+.. image:: https://img.shields.io/coveralls/collective/transmogrify.wordpress/master.svg
+    :target: https://coveralls.io/r/collective/transmogrify.wordpress
+
 ``transmogrify.wordpress`` provides a `collective.transmogrifier`_ pipeline
 for importing a Wordpress blog into Plone.
 
@@ -51,8 +60,8 @@ Other prerequisites:
 .. Note::
    The pipeline will take some time to run, and you'll probably get a timeout
    error unless you are accessing Zope directly with no proxy or web server in
-   front. Even if this happens the import will continue to run. Progress is 
-   logged to the Zope event log at the INFO level, so you can watch the log to  
+   front. Even if this happens the import will continue to run. Progress is
+   logged to the Zope event log at the INFO level, so you can watch the log to
    see what is happening.
 
 Alternatively, you can copy the wordpress.cfg pipeline into your own package,
@@ -103,7 +112,7 @@ Included Blueprints
 .. Note::
    This section contains advanced information on the components of the pipeline.
 
-``transmogrify.wordpress`` makes use of several custom transmogrifier 
+``transmogrify.wordpress`` makes use of several custom transmogrifier
 blueprints. Some of these would probably be useful in non-Wordpress-related
 pipelines and should probably get factored out into separate packages.
 
