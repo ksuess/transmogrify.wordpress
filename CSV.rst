@@ -22,6 +22,153 @@ Use the following options for all:
 
 For more information see: http://stackoverflow.com/a/31460534/644075
 
+Installation
+============
+
+Add ``transmogrify.wordpress`` to your buildout ``eggs`` and ``zcml`` directives:
+
+.. code-block:: ini
+
+    [buildout]
+    ...
+    eggs =
+        ...
+        transmogrify.wordpress
+    zcml =
+        ...
+        transmogrify.wordpress
+
+Create a transmogrifier pipeline including all sections that must be run to import the content.
+A typical pipeline is generally complex and could look like this one:
+
+.. code-block:: ini
+
+    [transmogrifier]
+    pipeline =
+        csvsource
+        fetchattachment
+        mimeencapsulator
+        folders
+        insert_transition
+        constructor
+        text_cleanup
+        atschemaupdater
+        schemaupdater
+        datesupdater
+        embedyoutube
+        defaultview
+        resolveuid
+        relatecontent
+        moveattachment
+        workflowupdater
+        reindexobject
+        savepoint
+        logger
+
+    [csvsource]
+    blueprint = transmogrify.wordpress.csvsource
+    source =
+    type = collective.nitf.content
+    skip = 146989,151344,151517
+    field-size-limit = 700000
+
+    [fetchattachment]
+    blueprint = transmogrify.wordpress.fetchattachment
+
+    [mimeencapsulator]
+    blueprint = plone.app.transmogrifier.mimeencapsulator
+    mimetype = item/_mimetype
+    field = python:'image' if item['portal_type'] == 'Image' else 'file'
+
+    [folders]
+    blueprint = collective.transmogrifier.sections.folders
+
+    [insert_transition]
+    blueprint = collective.transmogrifier.sections.inserter
+    key = string:_transitions
+    value = string:publish
+    condition = python:item.get('_type') == 'Folder'
+
+    [constructor]
+    blueprint = collective.transmogrifier.sections.constructor
+
+    [text_cleanup]
+    blueprint = transmogrify.wordpress.blueprints.text_cleanup
+    key = text
+
+    [atschemaupdater]
+    blueprint = plone.app.transmogrifier.atschemaupdater
+
+    [schemaupdater]
+    blueprint = transmogrify.dexterity.schemaupdater
+
+    [datesupdater]
+    blueprint = plone.app.transmogrifier.datesupdater
+
+    [embedyoutube]
+    blueprint = transmogrify.wordpress.embedyoutube
+
+    [defaultview]
+    blueprint = transmogrify.wordpress.defaultview
+    view = text_only_view
+    condition = python:item.get('portal_type') == 'collective.nitf.content'
+
+    [resolveuid]
+    blueprint = transmogrify.wordpress.resolveuid
+    type = collective.nitf.content
+    domain = www.conversaafiada.com.br
+
+    [relatecontent]
+    blueprint = transmogrify.wordpress.relatecontent
+    domain = www.conversaafiada.com.br
+
+    [moveattachment]
+    blueprint = transmogrify.wordpress.moveattachment
+    type = collective.nitf.content
+
+    [workflowupdater]
+    blueprint = plone.app.transmogrifier.workflowupdater
+
+    [reindexobject]
+    blueprint = plone.app.transmogrifier.reindexobject
+
+    [savepoint]
+    blueprint = collective.transmogrifier.sections.savepoint
+    every = 100
+
+    [logger]
+    blueprint = collective.transmogrifier.sections.logger
+    name = WordPress
+    level = INFO
+    key = _path
+
+The core of the transmogrify process is the ``csvsource`` section, as it will serve as a source of all the information to import the WordPress site.
+
+The ``fetchattachment`` section takes care of importing file and image attachments;
+this section will fetch those static files from the site we're importing in real time.
+That means the site we're importing must be accessible from the computer running the transmogrifier process.
+
+The ``mimeencapsulator`` section is a helper to decide what kind of content type will be created using the fetched attachment.
+
+The ``folders`` section will create the site structure.
+The ``insert_transition`` section is a helper to publish the site structure created on the previous section.
+
+The ``constructor`` sections takes care of creating all content types instances.
+
+The ``text_cleanup`` section is used to remove some WordPress sppecific patterns on text fields, like the usage of newline characters instead of ``<p>`` and ``<br>`` tags.
+It will also remove custom caption tags and encode the text, if necessary.
+
+The ``atschemaupdater`` and ``schemaupdater`` sections takes care of updating the content type instance schemas.
+You can use the later only in case you site uses Dexterity-based content types only.
+
+The ``datesupdater`` section will set the right creation and modification time on the content type instances.
+
+The ``embedyoutube`` section is replaces to youtube pseudo-tags and replace with <iframe> tags refering to YouTube videos.
+
+The ``defaultview`` section can be used in case you want to set a default view different from ``view``.
+
+``resolveuid`` and ``relatecontent`` are post-processing sections that run after the import process has finished.
+
 Importing polls
 ---------------
 
