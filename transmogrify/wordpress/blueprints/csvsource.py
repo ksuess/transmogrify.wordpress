@@ -16,6 +16,7 @@ from zope.interface import implements
 import csv
 import os.path
 
+
 csv_options = dict(dialect='excel-tab', doublequote=False, escapechar='\\')
 KNOWN_POST_TYPES = ('post', 'page', 'attachment', 'revision')
 

@@ -1,25 +1,25 @@
-import urllib2
-from urlparse import urlsplit
-import re
-from lxml import etree, cssselect, html
-import phpserialize
-from urllib import unquote_plus
-from zope.interface import classProvides, implements
+# -*- coding: utf-8 -*-
 from collective.transmogrifier.interfaces import ISection
 from collective.transmogrifier.interfaces import ISectionBlueprint
 from collective.transmogrifier.utils import defaultMatcher
-
 from DateTime import DateTime
-from zope.component import createObject
-from plone.app.discussion.interfaces import IConversation
-from Products.CMFPlone.utils import safe_unicode
-# from Products.TinyMCE.transforms.parser import TinyMCEOutput, singleton_tags
-from plone.outputfilters.filters.resolveuid_and_caption import ResolveUIDAndCaptionFilter
-
-from StringIO import StringIO
+from lxml import etree, cssselect, html
 from OFS.Image import File
+from plone.app.discussion.interfaces import IConversation
+from plone.outputfilters.filters.resolveuid_and_caption import ResolveUIDAndCaptionFilter
+from Products.CMFPlone.utils import safe_unicode
+from StringIO import StringIO
+from urllib import unquote_plus
+from urlparse import urlsplit
+from zope.component import createObject
+from zope.interface import classProvides, implements
 
 import logging
+import phpserialize
+import re
+import urllib2
+
+
 logger = logging.getLogger('transmogrify.wordpress')
 
 # XML namespaces

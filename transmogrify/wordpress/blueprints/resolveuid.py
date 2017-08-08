@@ -17,6 +17,7 @@ from zope.interface import implements
 import itertools
 import re
 
+
 # This regex look for <img> or <a> tags and break the text into 3 parts
 # isolating the src or href attribute content to update
 URL_RE = re.compile(

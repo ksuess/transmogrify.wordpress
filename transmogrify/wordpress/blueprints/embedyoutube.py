@@ -7,6 +7,7 @@ from zope.interface import implements
 
 import re
 
+
 YOUTUBE_RE = re.compile(r'\[youtube.*?id=[\\"]+(.*?)[\\"]+\.*?]', re.IGNORECASE | re.DOTALL)
 
 
