@@ -9,7 +9,6 @@ from transmogrify.wordpress.logger import logger
 from transmogrify.wordpress.utils import fix_id
 from transmogrify.wordpress.utils import strip_tags
 from urlparse import urlparse
-from zExceptions import BadRequest
 from zope.interface import classProvides
 from zope.interface import implements
 
@@ -56,40 +55,6 @@ def _skip(row, skip):
     return False
 
 
-def _get_path(id, post_type, category, date):
-    """Return the path to the item; this will be used to create the
-    object and its containers if needed.
-
-    :param id: [required] id of the post
-    :type id: string
-    :param post_type: [required] WordPress post type
-    :type post_type: string
-    :param category: [required] slug of the category
-    :type category: string
-    :param date: [required] creation date
-    :type date: DateTime
-    :returns: path to the object starting from the root of the site
-    :rtype: string
-    :raises: zExceptions.BadRequest
-    """
-    if bad_id(id) is not None:
-        raise BadRequest
-
-    if post_type != 'attachment':
-        # for posts and pages we need to contruct the path
-        # according to the permalink structure:
-        # "/%category%/%year%/%monthnum%/%day%/%postname%/"
-        permalink_structure = '/{0}/{1}/{2}'.format(
-            category, date.Date(), id)
-    else:
-        # for attachments we use the default location:
-        # "/wp-content/uploads/%year%/%monthnum%/"
-        permalink_structure = '/wp-content/uploads/{0}/{1}'.format(
-            date.Date()[:-3], id)
-
-    return permalink_structure
-
-
 class CSVSource(object):
 
     """Blueprint section to import from a CSV export."""
@@ -105,6 +70,28 @@ class CSVSource(object):
         self.skip = options.get('skip', '').replace(' ', '').split(',')
         self.display_names = get_display_names(self.source)
         self.taxonomies = get_taxonomies(self.source)
+
+    def get_path(self, row, id_, post_type, item):
+        """Return the path to the item; this will be used to create the
+        object and its containers if needed.
+
+        :returns: path to the object starting from the root of the site
+        :rtype: string
+        """
+        if post_type == 'attachment':
+            # for attachments we use the default location:
+            # "/wp-content/uploads/%year%/%monthnum%/"
+            date = DateTime(item['creation_date']).strftime('%Y/%m')
+            path = '/wp-content/uploads/{0}/{1}'.format(date, id_)
+        else:
+            # for posts and pages we need to contruct the path
+            # according to the permalink structure:
+            # "/%category%/%year%/%monthnum%/%day%/%postname%/"
+            category, _ = self.taxonomies[row]  # could raise KeyError
+            date = DateTime(item['creation_date']).strftime('%Y/%m/%d')
+            path = '/{0}/{1}/{2}'.format(category, date, id_)
+
+        return path
 
     def __iter__(self):
         for item in self.previous:
@@ -150,24 +137,21 @@ class CSVSource(object):
                     item_id = item['title'] = url.path.split('/')[-1]
                     item_id = fix_id(item_id)
 
-                try:
-                    category, tags = self.taxonomies[row['ID']]
-                except KeyError:
-                    # files defining taxonomies are probably outdated
-                    logger.warn('No taxonomies found for row ID: ' + row['ID'])
+                # on Zope ids can't start with "_"
+                if bad_id(item_id) is not None:
+                    logger.warn('Invalid object id on row ID: ' + row['ID'])
                     continue
 
                 # WordPress stores only publication and modification times
-                item['effective_date'] = row['post_date']
-                item['modification_date'] = row['post_modified']
                 # we use publication date as creation date
-                item['creation_date'] = item['effective_date']
-                date = DateTime(item['creation_date'])
+                item['creation_date'] = item['effective_date'] = row['post_date']
+                item['modification_date'] = row['post_modified']
 
                 try:
-                    item['_path'] = _get_path(item_id, post_type, category, date)
-                except BadRequest:
-                    logger.warn('Invalid object id on row ID: ' + row['ID'])
+                    item['_path'] = self.get_path(row['ID'], item_id, post_type, item)
+                except KeyError:
+                    # files defining taxonomies are probably outdated
+                    logger.warn('No taxonomies found for row ID: ' + row['ID'])
                     continue
 
                 item['description'] = row['post_excerpt']

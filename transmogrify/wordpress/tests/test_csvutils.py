@@ -54,31 +54,6 @@ class CSVUtilsTestCase(unittest.TestCase):
         del row['comment_count']
         self.assertTrue(_skip(row, []))
 
-    def test_get_path(self):
-        from DateTime import DateTime
-        from transmogrify.wordpress.blueprints.csvsource import _get_path
-        from zExceptions import BadRequest
-
-        post_type, category, date = 'post', 'foo', DateTime('29/07/2015')
-
-        id = 'bar%baz'  # invalid id
-        with self.assertRaises(BadRequest):
-            _get_path(id, post_type, category, date)
-
-        # posts and pages
-        id = 'bar.baz'
-        self.assertEqual(
-            _get_path(id, post_type, category, date),
-            '/foo/2015/07/29/bar.baz'
-        )
-
-        # images and files
-        post_type = 'attachment'
-        self.assertEqual(
-            _get_path(id, post_type, category, date),
-            '/wp-content/uploads/2015/07/bar.baz'
-        )
-
     def test_read_term_relationships(self):
         from transmogrify.wordpress.blueprints.csvutils import read_term_relationships
         path = os.path.dirname(__file__)
