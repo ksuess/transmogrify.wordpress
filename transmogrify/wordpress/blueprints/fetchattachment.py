@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from collective.transmogrifier.interfaces import ISection
 from collective.transmogrifier.interfaces import ISectionBlueprint
+from plone.dexterity.interfaces import IDexterityContent
+from Products.Archetypes.interfaces import IBaseObject
 from requests.exceptions import ConnectionError
 from requests.exceptions import RequestException
 from transmogrify.wordpress.logger import logger
@@ -69,8 +71,13 @@ class FetchAttachment(object):
                 # content-length header could be missing if remote web
                 # server is misconfigured for some mime types
                 size = int(r.headers.get('content-length', 0))
+                objsize = 0
+                if IBaseObject.providedBy(obj):
+                    objsize = obj.size()
+                elif IDexterityContent.providedBy(obj):
+                    objsize = obj.get_size()
 
-                if size == obj.size():  # already downloaded it
+                if size == objsize:  # already downloaded it
                     yield item
                     continue
 
@@ -83,7 +90,7 @@ class FetchAttachment(object):
 
             if r.status_code != 200:  # log error and skip item
                 fetch_errors.append(url)
-                msg = u'Error {0} when fetching {1}'.format(r.status_code, url)
+                msg = 'Error {0} when fetching {1}'.format(r.status_code, url)
                 logger.warn(msg)
                 yield item
                 continue
