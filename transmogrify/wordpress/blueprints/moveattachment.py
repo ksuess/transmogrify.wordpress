@@ -5,8 +5,6 @@ from collective.transmogrifier.utils import defaultMatcher
 from collective.transmogrifier.utils import traverse
 from plone import api
 from plone.dexterity.interfaces import IDexterityContent
-from Products.Archetypes.interfaces import IBaseObject
-from Products.Archetypes.interfaces import IReferenceable
 from zope.interface import classProvides
 from zope.interface import implements
 
@@ -50,12 +48,12 @@ class MoveAttachment(object):
             if obj.portal_type not in ('Image', 'File'):
                 continue
 
-            references = []
-            if IBaseObject.providedBy(obj):
-                references = obj.getBackReferences()
-            elif IDexterityContent.providedBy(obj):
+            if IDexterityContent.providedBy(obj):
+                from Products.Archetypes.interfaces import IReferenceable
                 adapted = IReferenceable(obj)
                 references = adapted.getBackReferences()
+            else:  # Archetypes
+                references = obj.getBackReferences()
             if len(references) != 1:
                 continue
 

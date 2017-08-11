@@ -7,7 +7,6 @@ from plone.app.linkintegrity.handlers import modifiedArchetype
 from plone.app.linkintegrity.handlers import modifiedDexterity
 from plone.app.textfield.value import RichTextValue
 from plone.dexterity.interfaces import IDexterityContent
-from Products.Archetypes.interfaces import IBaseObject
 from transmogrify.wordpress.logger import logger
 from transmogrify.wordpress.utils import fix_id
 from urlparse import urlparse
@@ -74,10 +73,10 @@ class ResolveUID(object):
 
             # XXX: this seems to be very expensive
             # Update linkintegrity references
-            if IBaseObject.providedBy(obj):
-                modifiedArchetype(obj, event=None)
-            elif IDexterityContent.providedBy(obj):
+            if IDexterityContent.providedBy(obj):
                 modifiedDexterity(obj, event=None)
+            else:  # Archetypes
+                modifiedArchetype(obj, event=None)
 
     def resolve_uid(self, x):
         """Parse HTML and update with URLs pointing to Plone objects.

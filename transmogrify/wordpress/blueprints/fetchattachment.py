@@ -2,7 +2,6 @@
 from collective.transmogrifier.interfaces import ISection
 from collective.transmogrifier.interfaces import ISectionBlueprint
 from plone.dexterity.interfaces import IDexterityContent
-from Products.Archetypes.interfaces import IBaseObject
 from requests.exceptions import ConnectionError
 from requests.exceptions import RequestException
 from transmogrify.wordpress.logger import logger
@@ -71,11 +70,10 @@ class FetchAttachment(object):
                 # content-length header could be missing if remote web
                 # server is misconfigured for some mime types
                 size = int(r.headers.get('content-length', 0))
-                objsize = 0
-                if IBaseObject.providedBy(obj):
-                    objsize = obj.size()
-                elif IDexterityContent.providedBy(obj):
+                if IDexterityContent.providedBy(obj):
                     objsize = obj.get_size()
+                else:  # Archetypes
+                    objsize = obj.size()
 
                 if size == objsize:  # already downloaded it
                     yield item
