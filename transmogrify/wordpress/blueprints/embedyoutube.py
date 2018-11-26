@@ -52,6 +52,5 @@ class EmbedYoutube(object):
 
         logger.info('Embedding youtube video %s' % youtube_id)
 
-        return '<iframe src="https://www.youtube.com/embed/{0}"></iframe>'.format(
-            youtube_id
-        )
+        return '<iframe src="https://www.youtube.com/embed/{0}"></iframe>'\
+            .format(youtube_id)

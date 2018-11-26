@@ -21,3 +21,6 @@ Changelog
 
 - Travis
   [ksuess]
+
+- Author: insert id and display name
+  [ksuess]

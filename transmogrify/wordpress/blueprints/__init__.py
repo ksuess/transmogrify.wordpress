@@ -55,6 +55,7 @@ class WXRSource(object):
         file = open(self.filename, 'rb')
         i = 0
         self.wp_base_site_url = self.wp_base_blog_url = None
+        self.author = {}
         for event, node in etree.iterparse(self.filename):
             # extract the base site and blog urls for later comparison
             if not (self.wp_base_site_url and self.wp_base_blog_url):
@@ -64,6 +65,11 @@ class WXRSource(object):
                     self.wp_base_site_url = node.text
                 if node.tag == WP + 'base_blog_url':
                     self.wp_base_blog_url = node.text
+
+            if node.tag == WP + 'author':
+                adn = node.findtext(WP + 'author_display_name')
+                al = node.findtext(WP + 'author_login')
+                self.author[al] = adn
 
             # workaround for bug in lxml < 3.2.2
             # (see https://bugs.launchpad.net/lxml/+bug/1185701)
@@ -76,13 +82,14 @@ class WXRSource(object):
             i += 1
             item = dict()
 
-            item['portal_type']   = self.portal_type
-            item_id               = node.findtext(WP + 'post_name')
+            item['portal_type'] = self.portal_type
+            item_id = node.findtext(WP + 'post_name')
             # Zope ids need to be ASCII
-            item_id = unquote_plus(item_id).decode('utf8').encode('ascii', 'ignore')
+            item_id = unquote_plus(item_id)\
+                .decode('utf8').encode('ascii', 'ignore')
             path = '/'.join([self.path, item_id])
-            item['_path']         = path
-            item['_orig_url']     = node.findtext('link')
+            item['_path'] = path
+            item['_orig_url'] = node.findtext('link')
 
             if self.wp_base_site_url:
                 item['_base_site_url'] = self.wp_base_site_url
@@ -105,21 +112,23 @@ class WXRSource(object):
             # 'wp:attachment_url' tag and associated post metadata
             item['_wordpress_attachments'] = self.extract_wp_attachments(node)
 
-            item['title']         = node.findtext('title')
-            item['description']   = node.findtext('description')
+            item['title'] = node.findtext('title')
+            item['description'] = node.findtext('description')
             item['creation_date'] = node.findtext('pubDate')
             item['effectiveDate'] = item['creation_date']
             item['modification_date'] = item['creation_date']
-            item['creators']      = [node.findtext(DC + 'creator')]
+            item['creators'] = [node.findtext(DC + 'creator')]
+            item['author_login'] = item['creators'][0]
+            item['author_display_name'] = self.author[item['author_login']]
 
             tags = set([])
             for category in node.iterfind('category'):
                 tags.add(category.text)
-            item['subject']       = sorted(tags)
+            item['subject'] = sorted(tags)
 
-            item['text']          = node.findtext(CONTENT + 'encoded')
+            item['text'] = node.findtext(CONTENT + 'encoded')
 
-            status                = node.findtext(WP + 'status')
+            status = node.findtext(WP + 'status')
             if status == 'publish':
                 item['_transitions'] = 'publish'
 
@@ -144,7 +153,7 @@ class WXRSource(object):
 
                     item = {
                         'portal_type': 'plone.Comment',
-                        '_path': path, # path to parent object
+                        '_path': path,  # path to parent object
                         '_comment_id': int(cmt.findtext(WP + 'comment_id')),
                         '_in_reply_to': int(cmt.findtext(WP + 'comment_parent')),
                         'author_name': author_name,
@@ -162,8 +171,7 @@ class WXRSource(object):
         file.close()
 
     def extract_media_enclosures(self, node):
-        """if the node has wp:postmeta 'enclosure' tags, preserve the
-        content as media files
+        """If the node has wp:postmeta 'enclosure' tags, preserve the content as media files.
         """
         # XXX: this is fairly naive, assuming that all enclosures contain
         #      a three-value meta_value, consisiting of the item url, size and
@@ -248,10 +256,11 @@ def safe_urlopen(url):
 
 
 class HTMLFetcher(object):
+    """Parse HTML for images and inject them into the pipeline.
+
+    so that they can be served locally.
     """
-    Parse HTML for images and inject them into the pipeline so that they can
-    be served locally.
-    """
+
     classProvides(ISectionBlueprint)
     implements(ISection)
 
@@ -307,7 +316,8 @@ class ImageMungingParser(ResolveUIDAndCaptionFilter):
                 src = attributes['src']
                 res = None
                 if self.atag and 'href' in self.atag:
-                    # image in a link; check if the link points to another image
+                    # image in a link
+                    # check if the link points to another image
                     href = self.atag['href']
                     res = safe_urlopen(href)
                     if res is not None:
@@ -332,17 +342,18 @@ class ImageMungingParser(ResolveUIDAndCaptionFilter):
 
                     # XXX choose scale size
 
-                    # prepare image info for injection to transmogrifier pipeline
+                    # prepare image info
+                    # for injection to transmogrifier pipeline
 
                     item = dict()
 
-                    item['portal_type']   = 'Image'
+                    item['portal_type'] = 'Image'
                     path = '/'.join([self.base_path, filename])
                     # XXX avoid collisions
-                    item['_path']         = path
+                    item['_path'] = path
                     logger.info('Importing %s' % path)
 
-                    item['image']         = data
+                    item['image'] = data
 
                     self.items.append(item)
 
@@ -404,8 +415,8 @@ class HTMLImageSource(object):
 
             yield item
 
-            for item in images:
-                yield item
+            for img in images:
+                yield img
 
 
 class WPPostmetaEnclosureSource(object):
@@ -428,7 +439,7 @@ class WPPostmetaEnclosureSource(object):
     def __iter__(self):
         for item in self.previous:
             # no enclosures, skip
-            if not self.enclosure_key in item:
+            if self.enclosure_key not in item:
                 yield item; continue
 
             # XXX: it would be good to add a relationship between enclosures
@@ -441,26 +452,22 @@ class WPPostmetaEnclosureSource(object):
                     scheme, host, path, query, frag = urlsplit(enclosure['url'])
                     filename = path.split('/')[-1]
                     # Zope ids need to be ASCII
-                    filename = unquote_plus(
-                        filename).decode('utf8').encode('ascii', 'ignore')
+                    filename = unquote_plus(filename)\
+                        .decode('utf8').encode('ascii', 'ignore')
                     encl = dict()
                     if 'image' in enclosure['mimetype']:
                         encl['portal_type'] = 'Image'
-                        filetitle = 'image'
                         item_key = 'image'
                     else:
                         encl['portal_type'] = 'File'
-                        filetitle = 'file'
                         item_key = 'file'
-                    # wrap the data so it'll get added with the correct
-                    # filename & mimetype
                     data = File(filename, filetitle, StringIO(res.read()),
                                 enclosure['mimetype'])
                     path = '/'.join([self.base_path, filename])
                     # XXX avoid collisions
                     encl['_path'] = path
                     encl[item_key] = data
-                    logger.info('Importing %s' % path)
+                    logger.info('Importing {0} {1} of {2}'.format(path, encl, item))
                     # add the location where this enclosure will be added
                     # to the list of internal enclosures.  We can use this
                     # later as a way of connecting the original item to the
@@ -505,26 +512,29 @@ class CommentConstructor(object):
         for item in self.previous:
             keys = item.keys()
             typekey = self.typekey(*keys)[0]
-            if item[typekey] != 'plone.Comment': # not a comment
-                yield item; continue
+            if item[typekey] != 'plone.Comment':  # not a comment
+                yield item
+                continue
 
             pathkey = self.pathkey(*item.keys())[0]
-            if not pathkey: # not enough info
-                yield item; continue
+            if not pathkey:  # not enough info
+                yield item
+                continue
             path = item[pathkey]
 
             ob = self.context.unrestrictedTraverse(path.lstrip('/'), None)
             if ob is None:
-                yield item; continue # object not found
+                yield item
+                continue  # object not found
 
             # XXX make sure comment doesn't exist already?
 
             conversation = IConversation(ob)
             comment = createObject('plone.Comment')
-            comment.text              = item['text']
-            comment.author_name       = item['author_name']
-            comment.author_email      = item['author_email']
-            comment.creation_date     = DateTime(item['created']).asdatetime()
+            comment.text = item['text']
+            comment.author_name = item['author_name']
+            comment.author_email = item['author_email']
+            comment.creation_date = DateTime(item['created']).asdatetime()
             comment.modification_date = comment.creation_date
             in_reply_to = item.get('_in_reply_to', 0)
             if in_reply_to:
