@@ -17,7 +17,7 @@ from zope.interface import classProvides, implements
 import logging
 import phpserialize
 import re
-import urllib2
+import requests
 
 
 logger = logging.getLogger('transmogrify.wordpress')
@@ -250,9 +250,12 @@ class WordpressTextCleanupSection(object):
 
 def safe_urlopen(url):
     try:
-        return urllib2.urlopen(urllib2.Request(url))
-    except urllib2.URLError:
-        return None
+        user_agent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:63.0) Gecko/20100101 Firefox/63.0'
+        headers = {'User-Agent': user_agent}
+        r = requests.get(url, headers=headers)
+        return r
+    except Exception as e:
+        logger.error(u'safe_urlopen {0} {1}'.format(e, url))
 
 
 class HTMLFetcher(object):
@@ -277,7 +280,7 @@ class HTMLFetcher(object):
                 url = item[self.url_key]
                 res = safe_urlopen(url)
                 if res is not None:
-                    page = res.read()
+                    page = res.text
                     tree = etree.parse(StringIO(page), etree.HTMLParser())
                     selector = cssselect.CSSSelector(self.selector)
                     text = ''.join([html.tostring(n) for n in tree.xpath(selector.path)[0]]).encode('utf8')
@@ -321,7 +324,7 @@ class ImageMungingParser(ResolveUIDAndCaptionFilter):
                     href = self.atag['href']
                     res = safe_urlopen(href)
                     if res is not None:
-                        mimetype = res.info()['content-type']
+                        mimetype = res.headers['content-type']
                         if 'image/' in mimetype:
                             src = href
                         else:
@@ -330,15 +333,15 @@ class ImageMungingParser(ResolveUIDAndCaptionFilter):
                 if res is None:
                     res = safe_urlopen(src)
                     if res is not None:
-                        mimetype = res.info()['content-type']
+                        mimetype = res.headers['content-type']
 
                 if res is not None:
                     scheme, host, path, query, frag = urlsplit(src)
                     filename = path.split('/')[-1]
                     # Zope ids need to be ASCII
-                    filename = unquote_plus(filename).decode('utf8').encode('ascii', 'ignore')
-                    # wrap the data so it'll get added with the correct filename & mimetype
-                    data = File(filename, 'image', StringIO(res.read()), mimetype)
+                    filename = unquote_plus(filename)\
+                        .decode('utf8').encode('ascii', 'ignore')
+                    data = res.content
 
                     # XXX choose scale size
 
@@ -461,8 +464,7 @@ class WPPostmetaEnclosureSource(object):
                     else:
                         encl['portal_type'] = 'File'
                         item_key = 'file'
-                    data = File(filename, filetitle, StringIO(res.read()),
-                                enclosure['mimetype'])
+                    data = res.content
                     path = '/'.join([self.base_path, filename])
                     # XXX avoid collisions
                     encl['_path'] = path

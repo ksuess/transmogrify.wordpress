@@ -24,3 +24,6 @@ Changelog
 
 - Author: insert id and display name
   [ksuess]
+
+- Use module requests instead of urllib2
+  [ksuess]

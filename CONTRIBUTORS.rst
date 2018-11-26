@@ -5,3 +5,4 @@ Contributors
 - Cris Ewing
 - Héctor Velarde
 - Rodrigo Ferreira de Souza
+- Katja Süss
