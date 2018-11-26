@@ -18,3 +18,6 @@ Changelog
 
 - Initial release.
   [davisagli]
+
+- Travis
+  [ksuess]
